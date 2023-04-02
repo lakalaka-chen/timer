@@ -13,7 +13,9 @@ TriggerTimer::TriggerTimer(int timeout, std::function<void()> callback)
 }
 
 TriggerTimer::~TriggerTimer() {
-    Stop();
+    if (running_thread_.joinable()) {
+        running_thread_.join();
+    }
 }
 
 void TriggerTimer::SetUpTimeout(int timeout) {
@@ -34,8 +36,7 @@ void TriggerTimer::Start() {
     is_running_ = true;
     start_ = Clock::now();
 //    pre_start_ = start_;
-    std::thread count_down(&TriggerTimer::_run, this);
-    count_down.detach();
+    running_thread_ = std::thread(&TriggerTimer::_run, this);
 }
 
 
@@ -63,6 +64,7 @@ void TriggerTimer::Reset(int timeout) {
 
 void TriggerTimer::_run() {
     std::unique_lock<std::mutex> lock(mu_);
+//    spdlog::debug("is running...");
     while (is_running_) {
         cv_.wait_for(lock, std::chrono::milliseconds(timeout_));
         if (!is_running_) { // 如果被外部调用Stop就直接退出

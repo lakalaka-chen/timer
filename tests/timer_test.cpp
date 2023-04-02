@@ -35,5 +35,23 @@ TEST(TimerTest, TEST1) {
         std::cout << "Input: ";
     }
 
+}
 
+TEST(TimerTest, ObjectCallbackTest) {
+
+    spdlog::set_level(spdlog::level::debug);
+
+    class B {
+    public:
+        int value_ = 3;
+        void callback() {
+            value_ *= 2;
+            spdlog::debug("B::timeout!");
+            spdlog::debug("new value = {}", value_);
+        }
+    };
+
+    B b;
+    TriggerTimer trig_timer(5000, &B::callback, &b);
+    trig_timer.Start();  // 开始倒计时
 }
