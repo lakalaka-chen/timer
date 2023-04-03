@@ -12,7 +12,7 @@ using namespace trigger_timer;
 
 
 
-TEST(TimerTest, TEST1) {
+TEST(TimerTest, ResetTest) {
 
     spdlog::set_level(spdlog::level::debug);
 
@@ -23,18 +23,10 @@ TEST(TimerTest, TEST1) {
     TriggerTimer trig_timer(5000, callback);
     trig_timer.Start();  // 开始倒计时
 
-    std::string cmd;
-
-    std::cout << "Input: ";
-    while (std::cin >> cmd) {
-        if (cmd == "reset") {
-            trig_timer.Reset(); // 事件触发, 重置计时器, 并且支持修改超时时间
-        } else if (cmd == "stop") {
-            trig_timer.Stop();
-        }
-        std::cout << "Input: ";
+    for (int i = 1; i <= 5; i ++) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(i*1000-100));
+        trig_timer.Reset();
     }
-
 }
 
 TEST(TimerTest, ObjectCallbackTest) {
@@ -52,6 +44,39 @@ TEST(TimerTest, ObjectCallbackTest) {
     };
 
     B b;
-    TriggerTimer trig_timer(5000, &B::callback, &b);
+    auto func = [&b] { b.callback(); };
+    TriggerTimer trig_timer(5000, func);
     trig_timer.Start();  // 开始倒计时
+}
+
+
+class Node {
+public:
+    Node(): t_ptr(new TriggerTimer) {  };
+    ~Node() { spdlog::debug("Dec"); t_ptr.reset(); }
+    void callback() { spdlog::debug("Node::timeout. "); }
+
+    std::shared_ptr<TriggerTimer> t_ptr;
+};
+
+
+TEST(TimerTest, ReStartTest) {
+
+    spdlog::set_level(spdlog::level::debug);
+
+    std::shared_ptr<Node> node(new Node);
+    node->t_ptr->SetUpTimeout(5000);
+    auto w_node = std::weak_ptr<Node>(node);
+    auto func = [w_node] { w_node.lock()->callback(); };
+    node->t_ptr->SetUpCallback(func);
+    node->t_ptr->Start();
+}
+
+TEST(TimerTest, CycleTimerTest) {
+    spdlog::set_level(spdlog::level::debug);
+    auto callback = []{ spdlog::debug("Time Out. "); };
+    CycleTimer timer(3000, callback);
+    timer.Start();
+    std::this_thread::sleep_for(std::chrono::seconds(13));
+    timer.Stop();
 }
