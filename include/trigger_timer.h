@@ -11,7 +11,6 @@ using Clock = std::chrono::steady_clock;
 using TimePoint = std::chrono::steady_clock::time_point;
 
 
-
 class TimerBase {
 protected:
     virtual void _run() = 0;
@@ -26,6 +25,7 @@ public:
     void Stop();
     void SetUpCallback(std::function<void()> callback);
     void SetUpTimeout(int timeout);
+    bool HasCallback();
 
 
 protected:

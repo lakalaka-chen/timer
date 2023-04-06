@@ -49,6 +49,12 @@ void TimerBase::Stop() {
 }
 
 
+bool TimerBase::HasCallback() {
+    std::unique_lock<std::mutex> lock(mu_);
+    return callback_ == nullptr;
+}
+
+
 /** TriggerTimer **/
 
 
@@ -60,9 +66,7 @@ TriggerTimer::TriggerTimer(int timeout, std::function<void()> callback)
 }
 
 TriggerTimer::~TriggerTimer() {
-    spdlog::debug("here");
     if (running_thread_.joinable()) {
-        spdlog::debug("join");
         running_thread_.join();
     }
 }
@@ -77,6 +81,9 @@ void TriggerTimer::Start() {
     std::unique_lock<std::mutex> lock(mu_);
     is_running_ = true;
     start_ = Clock::now();
+    if (running_thread_.joinable()) {
+        running_thread_.detach();
+    }
     running_thread_ = std::thread(&TriggerTimer::_run, this);
 }
 
@@ -86,14 +93,16 @@ void TriggerTimer::_run() {
     while (is_running_) {
         cv_.wait_for(lock, std::chrono::milliseconds(timeout_));
         if (!is_running_) { // 如果被外部调用Stop就直接退出
-            spdlog::debug("Outer call `Stop`");
+//            spdlog::debug("Outer call `Stop`");
             break;
         }
         if (Clock::now() - start_ >= std::chrono::milliseconds(timeout_)) {
             if (callback_) {
+                is_running_ = false;
+                lock.unlock();
                 callback_();
+                return;
             }
-            break; // 超时之后就不用继续计时了
         } // else: 外部调用reset则继续重新计时
     }
 }
@@ -111,9 +120,9 @@ CycleTimer::CycleTimer(int timeout, std::function<void()> callback)
 
 
 CycleTimer::~CycleTimer() {
-    spdlog::debug("here");
+//    spdlog::debug("here");
     if (running_thread_.joinable()) {
-        spdlog::debug("join");
+//        spdlog::debug("join");
         running_thread_.join();
     }
 }
@@ -128,6 +137,9 @@ void CycleTimer::Start() {
     std::unique_lock<std::mutex> lock(mu_);
     is_running_ = true;
     start_ = Clock::now();
+    if (running_thread_.joinable()) {
+        running_thread_.detach();
+    }
     running_thread_ = std::thread(&CycleTimer::_run, this);
 }
 
@@ -141,7 +153,9 @@ void CycleTimer::_run() {
         }
         if (Clock::now() - start_ >= std::chrono::milliseconds(timeout_)) {
             if (callback_) {
+                lock.unlock();
                 callback_();
+                lock.lock();
             }
             continue;  // 循环计时
         }
